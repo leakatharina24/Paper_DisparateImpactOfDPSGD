@@ -3,6 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
 import matplotlib.gridspec as gridspec
+import warnings
 
 # %% for performances
 
@@ -14,19 +15,30 @@ def significance_test_larger(mean1, mean2, std1, std2):
     # std1 = 0.0013
     # std2 = 0.0005
     
-    # print(f'{mean1}+/-{std1} vs. {mean2}+/-{std2}')
-    
-    t_statistic = (mean1 - mean2) / np.sqrt((std1**2 / 5) + (std2**2 / 5))
-    
-    df = ((std1**2 / 5) + (std2**2 / 5))**2 / (((std1**2 / 5)**2 / (5 - 1)) + ((std2**2 / 5)**2 / (5 - 1)))
-         
-    p_value = stats.t.sf(np.abs(t_statistic), df)  # one-tailed test (because null hypothesis is that mean1 > mean2)
-    
-    # print(f"T-statistic: {t_statistic:.4f}, P-value: {p_value:.10f}")
-    if p_value < 0.05 and t_statistic < 0:
-        return True
-    else:
-        return False
+    # # print(f'{mean1}+/-{std1} vs. {mean2}+/-{std2}')
+    if np.isnan(mean1) or np.isnan(mean2):
+        return np.nan
+
+    try:    
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)        
+            t_statistic = (mean1 - mean2) / np.sqrt((std1**2 / 5) + (std2**2 / 5))
+        
+            df = ((std1**2 / 5) + (std2**2 / 5))**2 / (((std1**2 / 5)**2 / (5 - 1)) + ((std2**2 / 5)**2 / (5 - 1)))
+                 
+            p_value = stats.t.sf(np.abs(t_statistic), df)  # one-tailed test (because null hypothesis is that mean1 > mean2)
+            
+            # print(f"T-statistic: {t_statistic:.4f}, P-value: {p_value:.10f}")
+            if p_value < 0.05 and t_statistic < 0:
+                return True
+            else:
+                return False
+            
+    except:
+        if mean1 < mean2:
+            return True
+        else:
+            return False
 
 # t-statistics: if negative, mean1 < mean2
 # if p_value < 0.05: reject null hypothesis
@@ -43,17 +55,28 @@ def significance_test_smaller(mean1, mean2, std1, std2):
     
     # print(f'{mean1}+/-{std1} vs. {mean2}+/-{std2}')
     
-    t_statistic = (mean1 - mean2) / np.sqrt((std1**2 / 5) + (std2**2 / 5))
+    if np.isnan(mean1) or np.isnan(mean2):
+        return np.nan
     
-    df = ((std1**2 / 5) + (std2**2 / 5))**2 / (((std1**2 / 5)**2 / (5 - 1)) + ((std2**2 / 5)**2 / (5 - 1)))
-         
-    p_value = stats.t.sf(np.abs(t_statistic), df)  # one-tailed test (because null hypothesis is that mean1 > mean2)
-    
-    # print(f"T-statistic: {t_statistic:.4f}, P-value: {p_value:.10f}")
-    if p_value < 0.05 and t_statistic > 0:
-        return True
-    else:
-        return False
+    try:    
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            t_statistic = (mean1 - mean2) / np.sqrt((std1**2 / 5) + (std2**2 / 5))
+            
+            df = ((std1**2 / 5) + (std2**2 / 5))**2 / (((std1**2 / 5)**2 / (5 - 1)) + ((std2**2 / 5)**2 / (5 - 1)))
+                 
+            p_value = stats.t.sf(np.abs(t_statistic), df)  # one-tailed test (because null hypothesis is that mean1 > mean2)
+            
+            # print(f"T-statistic: {t_statistic:.4f}, P-value: {p_value:.10f}")
+            if p_value < 0.05 and t_statistic > 0:
+                return True
+            else:
+                return False
+    except:
+        if mean1 > mean2:
+            return True
+        else:
+            return False 
 
 # t-statistics: if positive, mean1 > mean2
 # if p_value < 0.05: reject null hypothesis
@@ -63,7 +86,7 @@ def significance_test_smaller(mean1, mean2, std1, std2):
 
 path = "../Final_results"
 dataset = "adult"
-C_selection = 'best' #'worst'
+C_selection = 'worst' #'worst'
 
 method = "regular"
 epsilon = 5
@@ -152,7 +175,7 @@ print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
 pmetrics = ['accuracy', 'roc_auc', 'pr_auc']
 # C_selection = 'best'
 
-print('Does tuning sifnificantly improve DPSGD?')
+print('Does tuning significantly improve DPSGD?')
 for pmetric in pmetrics:
     best_setting_valid = results[f"valid_{pmetric}"].argmax()
     best_hps = results[["epochs", 'lr', 'batch_size', 'activation', 'optimizer']].iloc[best_setting_valid]
@@ -202,7 +225,7 @@ for pmetric in pmetrics:
     print('-------------------')
     
 print('---------------------------------------------------')
-print('Is tuned SGD signifianctly better than tuned DPSGD?')
+print('Is tuned SGD significantly better than tuned DPSGD?')
 for pmetric in pmetrics:
     best_setting_valid = results[f"valid_{pmetric}"].argmax()
     best_hps = results[["epochs", 'lr', 'batch_size', 'activation', 'optimizer']].iloc[best_setting_valid]
@@ -619,7 +642,7 @@ print(str(round(results[f'{pmetric}_mean'].iloc[best_setting_valid], 4))+' ± '+
 if dataset == 'mnist':
     fmetrics = [pmetric, 'PPV']
 else:
-    fmetrics = [pmetric, "acceptance_rate", 'PPV', 'equalized_odds']
+    fmetrics = [pmetric, "acceptance_rate", 'equalized_odds', 'PPV']
 for fmetric in fmetrics:
     print(str(round(results[f"{fmetric}_difference_mean"].iloc[best_setting_valid], 4))+' ± '+str(round(results[f"{fmetric}_difference_std"].iloc[best_setting_valid], 4)))
 print('-----------------------')
@@ -650,11 +673,13 @@ for fmetric in fmetrics:
     print(str(round(dp_results[f"{fmetric}_difference_mean"].iloc[best_setting_valid_dp], 4)) +' ± '+str(round(dp_results[f"{fmetric}_difference_std"].iloc[best_setting_valid_dp], 4)))
 print('-----------------------')
 
+best_setting_valid_dp_global = dp_global_results[f"valid_{pmetric}"].argmax()
+
 overall_condition = pd.Series([True] * dp_global_results.shape[0])
 if dataset == 'mnist':
     fmetrics = [pmetric, 'PPV']
 else:
-    fmetrics = [pmetric, 'acceptance_rate', 'PPV', 'equalized_odds']
+    fmetrics = [pmetric, 'acceptance_rate', 'equalized_odds', 'PPV']
 
 for hp in ["epochs", 'lr', 'batch_size', 'activation', 'optimizer']:
     new_condition = dp_global_results[hp] == best_hps[hp]
