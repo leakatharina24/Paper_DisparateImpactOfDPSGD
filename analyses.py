@@ -85,8 +85,8 @@ def significance_test_smaller(mean1, mean2, std1, std2):
 # %% data loading
 
 path = "../Final_results"
-dataset = "adult"
-C_selection = 'worst' #'worst'
+dataset = "folktable"
+C_selection = 'worst' #'best' #
 
 method = "regular"
 epsilon = 5
@@ -96,6 +96,9 @@ if dataset == 'celeba':
 elif dataset == 'mnist':
     num_samples = 50
     protected_group = 'labels'
+elif dataset == 'folktable':
+    num_samples = 128
+    protected_group = 'deye'
 else:
     num_samples = 128
     protected_group = 'sex'
@@ -105,7 +108,6 @@ if dataset == 'celeba':
     results = results.iloc[:50]
 if dataset != 'mnist':
     results = results.rename(columns={'equalized_odds_mean': 'equalized_odds_difference_mean', 'equalized_odds_std': 'equalized_odds_difference_std'})
-
 
 method = "dpsgd"
 #epsilon = 10
@@ -121,6 +123,11 @@ if dataset == 'celeba':
 dp_global_results = pd.read_csv(f'{path}/{dataset}_{method}_{protected_group}_{num_samples}_epsilon{epsilon}.csv', delimiter=',', header=0)
 if dataset != 'mnist':
     dp_global_results = dp_global_results.rename(columns={'equalized_odds_mean': 'equalized_odds_difference_mean', 'equalized_odds_std': 'equalized_odds_difference_std'})
+
+if dataset == 'folktable':
+    results = results[:50]
+    dp_results = dp_results[:150]
+    dp_global_results = dp_global_results[:150]
 
 # %% Results for Table 1: Disparate Impact of DPSGD
 
@@ -157,9 +164,11 @@ for pmetric in pmetrics:
     print(significance_test_smaller(mean1, mean2, std1, std2))
     
     if dataset == "mnist":
+        # fmetrics = pmetrics + ['PPV']
         fmetrics = [pmetric, 'PPV']
     else:
         fmetrics = [pmetric, 'acceptance_rate', 'equalized_odds', 'PPV']
+        # fmetrics = pmetrics + ['acceptance_rate', 'equalized_odds', 'PPV']
     for fmetric in fmetrics:
         mean1 = results[f'{fmetric}_difference_mean'].iloc[best_setting_valid]
         std1 = results[f'{fmetric}_difference_std'].iloc[best_setting_valid]
@@ -167,6 +176,7 @@ for pmetric in pmetrics:
         std2 = dp_results_baseline[f'{fmetric}_difference_std'].iloc[C_valid]
         
         print(significance_test_larger(mean1, mean2, std1, std2))
+
     print('-------------------')
 print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')    
 
@@ -261,7 +271,7 @@ percentage_best = 0.05
 num_best = round(results.shape[0]*percentage_best)
 num_best_dp = round(dp_results.shape[0]*percentage_best)
 
-plt.figure()
+plt.figure(figsize=(5,3))
 plt.scatter(results.sort_values(f'valid_{pmetric}')[f'{pmetric}_mean'].iloc[-num_best:], results.sort_values(f'valid_{pmetric}')[f'{fmetric}_difference_mean'].iloc[-num_best:], s=20, alpha=1)
 plt.scatter(dp_results.sort_values(f'valid_{pmetric}')[f'{pmetric}_mean'].iloc[-num_best_dp:], dp_results.sort_values(f'valid_{pmetric}')[f'{fmetric}_difference_mean'].iloc[-num_best_dp:], s=20, alpha=1, c='red', marker='x')
 
@@ -282,6 +292,8 @@ if fmetric == 'accuracy':
     plt.xlabel('Accuracy')
     plt.ylabel('Accuracy difference')
 #plt.title(f'{dataset}')
+#plt.savefig(f"C:/Users/ldemelius/OneDrive - know-center.at/Projects/DPFairness/TMLR_submission/svg_figures/fluctuations_example.svg") #, dpi=300
+
 
 # %% Figs. 2-6: Lineplots and Heatmaps over all hyperparameter settings
 
@@ -445,6 +457,7 @@ ax3.set_yticks(ticks=np.arange(3))
 ax3.set_yticklabels(labels=y_labels)
 ax3.set_title('B)')
 fig.tight_layout()
+#fig.savefig(f"C:/Users/ldemelius/OneDrive - know-center.at/Projects/DPFairness/TMLR_submission/svg_figures/{dataset}_{protected_group}_lineplot_heatmap_{C_selection}.svg") #, dpi=300
 
 # %% Results for Table 3: DPSGD-Global-Adapt
 
@@ -629,7 +642,7 @@ cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{round(x / (n
 
 # %% print detailed results
 
-pmetric = "accuracy" #"pr_auc" #"roc_auc"
+pmetric = "roc_auc" #"accuracy" #"pr_auc" #
 
 best_setting_valid = results[f"valid_{pmetric}"].argmax()
 best_hps = results[["epochs", 'lr', 'batch_size', 'activation', 'optimizer']].iloc[best_setting_valid]

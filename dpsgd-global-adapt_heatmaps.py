@@ -62,28 +62,33 @@ def significance_test_smaller(mean1, mean2, std1, std2):
 # %% data loading
 
 path = "../Final_results"
-dataset = "compas"
-C_selection = 'best' #'worst
+#dataset = "compas"
+C_selection = 'best' #'worst' #
 
 pmetric = 'accuracy'
 fmetric = 'accuracy'
 
 fig = plt.figure(figsize=(12, 8))
-gs = gridspec.GridSpec(2, 6, height_ratios=[1, 1])
+gs = gridspec.GridSpec(2, 8, height_ratios=[1, 1])
 # First row (3 subplots)
-ax1 = fig.add_subplot(gs[0, 0:2])  # Row 0, Column 0
-ax2 = fig.add_subplot(gs[0, 2:4])  # Row 0, Column 1
-ax3 = fig.add_subplot(gs[0, 4:6])  # Row 0, Column 2
+ax1 = fig.add_subplot(gs[0, 1:3])  # Row 0, Column 0
+ax2 = fig.add_subplot(gs[0, 3:5])  # Row 0, Column 1
+ax3 = fig.add_subplot(gs[0, 5:7])  # Row 0, Column 2
 
 # Second row (2 subplots, taking up two columns each)
-ax4 = fig.add_subplot(gs[1, 1:3]) # Row 1, Columns 0 and 1
-ax5 = fig.add_subplot(gs[1, 3:5])  # Row 1, Column 2
+# ax4 = fig.add_subplot(gs[1, 0:2]) # Row 1, Columns 0 and 1
+# ax5 = fig.add_subplot(gs[1, 2:4])  # Row 1, Column 2
+# ax6 = fig.add_subplot(gs[1, 4:6])
+# ax7 = fig.add_subplot(gs[1, 6:8])
+ax4 = fig.add_subplot(gs[1, 1:3])  # Row 0, Column 0
+ax5 = fig.add_subplot(gs[1, 3:5])  # Row 0, Column 1
+ax6 = fig.add_subplot(gs[1, 5:7])  # Row 0, Column 2
 
-axs = [ax1, ax2, ax3, ax4, ax5]
+axs = [ax1, ax2, ax3, ax4, ax5, ax6]
 
-titles = ['A) Adult', 'B) LSAC', 'C) Compas', 'D) CelebA', 'E) MNIST']
+titles = ['A) Adult', 'B) LSAC', 'C) Compas', 'D) ACSEmployment', 'E) CelebA', 'F) MNIST']
 
-for i, dataset in enumerate(["adult", "lsac", "compas", "celeba", "mnist"]):
+for i, dataset in enumerate(["adult", "lsac", "compas", "folktable", "celeba", "mnist"]):
     method = "regular"
     epsilon = 5
     if dataset == 'celeba':
@@ -92,6 +97,9 @@ for i, dataset in enumerate(["adult", "lsac", "compas", "celeba", "mnist"]):
     elif dataset == 'mnist':
         num_samples = 50
         protected_group = 'labels'
+    elif dataset == 'folktable':
+        num_samples = 128
+        protected_group= "deye"
     else:
         num_samples = 128
         protected_group = 'sex'
@@ -117,7 +125,10 @@ for i, dataset in enumerate(["adult", "lsac", "compas", "celeba", "mnist"]):
     dp_global_results = pd.read_csv(f'{path}/{dataset}_{method}_{protected_group}_{num_samples}_epsilon{epsilon}.csv', delimiter=',', header=0)
     if dataset != 'mnist':
         dp_global_results = dp_global_results.rename(columns={'equalized_odds_mean': 'equalized_odds_difference_mean', 'equalized_odds_std': 'equalized_odds_difference_std'})
-
+    if dataset == 'folktable':
+        results = results[:50]
+        dp_results = dp_results[:150]
+        dp_global_results = dp_global_results[:150]
 
     percentage = 1. #0.05 #
     num_settings = round(percentage*results.shape[0])
@@ -199,14 +210,15 @@ for i, dataset in enumerate(["adult", "lsac", "compas", "celeba", "mnist"]):
     x_labels = ['worse', 'similar accuracy', 'better']
     y_labels = ['unfairer', 'similarly fair', 'fairer']
     axs[i].set_xticks(ticks=np.arange(3))
-    axs[i].set_xticklabels(labels=x_labels, rotation = 15)
+    axs[i].set_xticklabels(labels=x_labels, rotation = 25)
     axs[i].set_yticks(ticks=np.arange(3))
     axs[i].set_yticklabels(labels=y_labels) #, rotation=15)
     axs[i].set_title(f'{titles[i]}')
 
 fig.tight_layout(w_pad=2.5, h_pad=-3)
-cbar = fig.colorbar(heatmap, ax=[ax1, ax2, ax3, ax4, ax5], orientation='vertical', fraction=0.03, pad=0.04)
+cbar = fig.colorbar(heatmap, ax=[ax1, ax2, ax3, ax4, ax5, ax6], orientation='vertical', fraction=0.03, pad=0.04)
 cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{round(x / (num_settings*3) *100)}%'))
+fig.savefig(f"C:/Users/ldemelius/OneDrive - know-center.at/Projects/DPFairness/TMLR_submission/svg_figures/dpsgd_global_heatmap_all_{C_selection}_v2.svg")
 
 
 

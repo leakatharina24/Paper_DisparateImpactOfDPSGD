@@ -32,6 +32,8 @@ import csv
 import PIL
 import torchvision.transforms as transforms
 
+from folktables import BasicProblem, ACSDataSource, ACSEmployment
+
 class GroupLabelDataset(torch.utils.data.Dataset):
     ''' 
     Implementation of torch Dataset that returns features 'x', classification labels 'y', and protected group labels 'z'
@@ -121,6 +123,67 @@ def get_adult(cfg):
     x_train, x_test, y_train, y_test, z_train, z_test = train_test_split(df_preprocessed[feature_columns].values,df_preprocessed[target].values,
                                                                          df_preprocessed[protected_group].values,
                                                                          stratify=df_preprocessed[target],test_size=0.3,random_state=seed)
+    return x_train, x_test, y_train, y_test, z_train, z_test
+
+def get_folktable(cfg):
+    
+    def normalize(df, columns):
+        result = df.copy()
+        for column in columns:
+            mu = df[column].mean(axis=0)
+            sigma = df[column].std(axis=0)
+            assert sigma != 0
+            result[column] = (df[column] - mu) / sigma
+        return result
+    
+    data_root = cfg["data_root"]
+    protected_group = cfg["protected_group"]
+    group_ratios = cfg["group_ratios"]
+    seed = cfg["seed"]
+    target = "income"
+    
+    data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+    acs_data = data_source.get_data(states=["VA"], download=True)
+    features, label, group = ACSEmployment.df_to_pandas(acs_data)
+
+    features.rename(columns={'AGEP': 'age', 'SEX': 'sex', 'RELP': 'relationship', 
+                             'RAC1P': 'race', 'SCHL': 'education', 'MAR': 'marital_status', 
+                             'DIS':'disability', 'ESP': 'employment_parents', 'CIT': 'citizenship', 
+                             'MIG': 'migration', 'MIL': 'military', 'ANC': 'ancestry', 'NATIVITY':'nativity',
+                             'DEAR': 'dear', 'DEYE': 'deye', 'DREM': 'drem'}, inplace=True)
+
+    numerical_columns = ["age"]
+    if protected_group in numerical_columns:
+        numerical_columns.remove(protected_group)
+    features = normalize(features, numerical_columns)
+
+    binary_columns = ['disability', 'sex', 'nativity', 'dear', 'deye']
+    for binary_col in binary_columns:
+        mapped_values = features[binary_col].map({1: 0, 2: 1})
+        features.loc[:, binary_col] = mapped_values
+
+    # # make race binary
+    # def race_map(value):
+    #     if value != 1:
+    #         return (1)
+    #     return (0)
+
+    # mapped_race_values = features.race.map(race_map)
+    # features.loc[:, "race"] = mapped_race_values
+    
+    def citizen_map(value):
+        if value != 5:
+            return (1)
+        return (0)
+    
+    # convert to one-hot vectors
+    categorical_non_binary = ["education", "marital_status", "employment_parents",
+                              "relationship", "migration", "military", "ancestry", "drem", "race", "citizenship"]
+    features = pd.get_dummies(features, columns=categorical_non_binary)
+    
+    x_train, x_test, y_train, y_test, z_train, z_test = train_test_split(features.values,label.values.flatten(),
+                                                                             features[protected_group].values,
+                                                                             stratify=label,test_size=0.3,random_state=seed)
     return x_train, x_test, y_train, y_test, z_train, z_test
 
 def load_mnist(cfg):
@@ -344,6 +407,8 @@ def training_loop(cfg):
         x_train_val, x_test, y_train_val, y_test, z_train_val, z_test = prep_compas(cfg)
     elif cfg["dataset"] == "lsac":
         x_train_val, x_test, y_train_val, y_test, z_train_val, z_test = prep_lawschool(cfg)
+    elif cfg["dataset"] == "folktable":
+        x_train_val, x_test, y_train_val, y_test, z_train_val, z_test = get_folktable(cfg)
     else:
         raise ValueError("Crossvalidation not implemented yet for the dataset {cfg['dataset']")
     
@@ -525,6 +590,7 @@ def main():
     
     
         # ---------------------------------- CHANGED GONFIG: General ----------------------
+    cfg["dataset"] = 'folktable'
     cfg["device"] = device
     cfg['evaluate_angles'] = False
     cfg['evaluate_hessian'] = False
@@ -565,8 +631,10 @@ def main():
     # ---------------------------------- CHANGED GONFIG: for CelebA ----------------------
     #cfg["delta"] = 1e-6
     
+    # ---------------------------------- CHANGED GONFIG: for Folktable ----------------------
+    cfg["protected_group"] = 'deye'
     # ------------------------------------------------------------------------
-
+    
 
     # Checks group_ratios is specified correctly
     if len(cfg["group_ratios"]) != cfg["num_groups"]:
@@ -617,6 +685,8 @@ def main():
         hyperparams = pd.read_csv('hp_list_100_celeba.csv')
     elif cfg["dataset"] == 'mnist':
         hyperparams = pd.read_csv('hp_list_100_mnist.csv')
+    elif cfg["dataset"] == 'folktable':
+        hyperparams = pd.read_csv('hp_list_gridsearch_esipova.csv')
     
     if cfg["method"] == "regular":
         for i in range(cfg["num_samples"]):
