@@ -686,7 +686,7 @@ def main():
     elif cfg["dataset"] == 'mnist':
         hyperparams = pd.read_csv('hp_list_100_mnist.csv')
     elif cfg["dataset"] == 'folktable':
-        hyperparams = pd.read_csv('hp_list_gridsearch_esipova.csv')
+        hyperparams = pd.read_csv('hp_list_100_celeba.csv')
     
     if cfg["method"] == "regular":
         for i in range(cfg["num_samples"]):
